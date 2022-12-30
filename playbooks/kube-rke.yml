@@ -1,0 +1,128 @@
+- hosts: kubernetes
+  become: true
+  tasks:
+
+  - name: Create RKE directory
+    file:
+      path: /home/deploy/rke
+      state: directory
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: Download RKE file
+    ansible.builtin.get_url:
+      url: https://github.com/rancher/rke/releases/download/v1.3.8/rke_linux-amd64
+      dest: /home/deploy/rke/rke.exe
+      mode: '1777'
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: Copy cluster.yml
+    template:
+      src: /home/deploy/ansible/conf-dir/cluster.yml
+      dest: /home/deploy/rke/
+      owner: deploy
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: Copy ssh-key
+    ansible.builtin.copy:
+      src: /home/deploy/ansible/conf-dir/id_rsa
+      dest: /home/deploy/.ssh/
+      owner: deploy
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: Copy ssh-key-pub
+    ansible.builtin.copy:
+      src: /home/deploy/ansible/conf-dir/id_rsa.pub
+      dest: /home/deploy/.ssh/
+      owner: deploy
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: Set permission for ssh-key
+    ansible.builtin.file:
+      path: /home/deploy/.ssh/id_rsa
+      owner: deploy
+      group: deploy
+      mode: '0400'
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: Create Kube Directory
+    file:
+      path: /home/deploy/.kube
+      state: directory
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: Create config file in Kube
+    ansible.builtin.file:
+      path: /home/deploy/.kube/config
+      state: touch
+      mode: '1777'
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: RKE UP
+    shell: |
+      ./rke.exe up
+    args:
+      chdir: /home/deploy/rke/
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: kubectl installation
+    shell: |
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      curl -LO "https://dl.k8s.io/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+    args:
+      chdir: /home/deploy/rke/
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: kubectl installation-2
+    shell: |
+      echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+    args:
+      chdir: /home/deploy/rke/
+    register: kubectl
+    when:
+      - ('kubernetes' in group_names)    
+
+  - name: check kubectl status
+    debug: msg="{{kubectl.stdout}}"
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: kubectl installation-3
+    shell: |
+      sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      echo > /home/deploy/.kube/config
+      cat kube_config_cluster.yml > /home/deploy/.kube/config
+    args:
+      chdir: /home/deploy/rke/
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: Helm installation
+    shell: |
+      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      chmod 700 get_helm.sh
+      ./get_helm.sh
+    args:
+      chdir: /home/deploy/rke/
+    when:
+      - ('kubernetes' in group_names)      
+
+  - name: Setup Interface of Cluster
+      shell: |
+        cd /home/deploy/rke
+        helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+        kubectl create namespace cattle-system
+        helm install rancher rancher-stable/rancher \
+          --namespace cattle-system \
+          --set hostname=example.com \ ###optional
+          --set replicas=3 \
+          --set ingress.tls.source=secret
