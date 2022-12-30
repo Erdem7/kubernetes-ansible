@@ -1,0 +1,17 @@
+[servers]
+
+[kubernetes]
+kube-master-1 ansible_host=X.X.X.X kuberole='["controlplane"]'
+kube-master-2 ansible_host=X.X.X.X kuberole='["controlplane"]'
+kube-master-3 ansible_host=X.X.X.X kuberole='["controlplane"]'
+
+kube-etcd-1 ansible_host=X.X.X.X kuberole='["etcd"]'
+kube-etcd-2 ansible_host=X.X.X.X kuberole='["etcd"]'
+kube-etcd-3 ansible_host=X.X.X.X kuberole='["etcd"]'
+
+kube-worker-1 ansible_host=X.X.X.X kuberole='["worker"]'
+kube-worker-2 ansible_host=X.X.X.X kuberole='["worker"]'
+kube-worker-3 ansible_host=X.X.X.X kuberole='["worker"]'
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
