@@ -1,0 +1,38 @@
+- hosts: all
+  become: true
+  tasks:
+
+  - name: install dependencies
+    ansible.builtin.apt:
+      name: "{{item}}"
+      state: present
+      update_cache: yes
+    with_items:
+    - unzip
+    - apt-transport-https
+    - curl
+    - gnupg-agent
+    - software-properties-common
+
+    ### Docker
+  - name: Install Docker
+    shell: |
+      export VERSION=20.10 && curl -sSL get.docker.com | sh
+    when:
+      - ('kubernetes' in group_names)
+
+  - name: make sure that docker was started and enabled
+    service:
+      name: docker
+      state: started
+      enabled: yes
+    when:
+      - ('kubernetes' in group_names) 
+
+  - name: set deploy users perm for docker
+    shell: |
+      sudo usermod -aG docker deploy
+    become_method: su
+    become_user: deploy
+    when:
+      - ('kubernetes' in group_names) 
